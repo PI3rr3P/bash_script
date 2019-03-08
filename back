@@ -1,0 +1,22 @@
+#!/bin/bash
+
+function back
+{
+
+	# going back in the current path
+	local targetFolder=$1
+	if [[ targetFolder == "" ]]; then
+		echo -e "Folder name requested"
+		return 1
+	fi
+	# processing
+	local currentPath=$(pwd)
+	local targetPath=${currentPath%${targetFolder}*}
+	if [[ ${currentPath} == ${targetPath} ]]; then
+		echo -e "folder name (${targetFolder}) not found!"
+	else
+		targetPath+=${targetFolder}
+		cd ${targetPath}
+	fi
+	return 0
+}

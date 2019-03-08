@@ -1,0 +1,51 @@
+#!/bin/bash
+
+function goto
+{
+	#parse argument 
+	local targetFolder=$1
+	local MAX_RECURSION_DEPTH=10
+	# check argument
+	if [[ -z ${targetFolder} ]]; then
+		echo -e "usage $0:"
+		echo -e "    goto 'folderName'"
+		echo -e "    then go to the first occurence of this folder"
+		return 1
+	fi
+	if [[ $2 == '-d' ]]; then
+		MAX_RECURSION_DEPTH=${3:-10}
+	fi
+	# declaration bloc
+	declare -i depth=1
+	local endSearch='false'
+	local finalDestination=""
+	# check for first occurence in the file tree
+	while [[ ${endSearch} == 'false' ]] && [[ ${depth} -le ${MAX_RECURSION_DEPTH} ]]; 
+	do
+		declare -a pathFounded=$(find ${HOME} -maxdepth $depth -mindepth $depth -path "*/${targetFolder}" -type d )
+		pathFounded=(${pathFounded})
+		if [[ ${#pathFounded[@]} -gt 0 ]]; then
+			finalDestination=${pathFounded[0]}
+			if (( ${#pathFounded[@]} > 1 )); then
+				echo -e " other match could be :"
+				for (( i=1; i < ${#pathFounded[@]}; i++))
+				do
+					echo -e "\tcd ${pathFounded[i]}"
+				done
+			fi
+			endSearch='true'
+		fi
+		depth=$(( ${depth} + 1 ))
+	done
+	# change folder or send an error message
+	if [[ finalDestination != "" ]]; then
+		cd ${finalDestination}
+	elif [[ ${depth} -gt ${MAX_RECURSION_DEPTH} ]]; then
+		echo -e "Can't reach that folder because of max recursion depth"
+		depth=$(( $depth + 1 ))
+		echo -e " file to deep, try goto folderName -d $depth"
+	else
+		echo -e "Can't file that folder: ${targetFolder}"
+	fi
+	return 0
+}
