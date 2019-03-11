@@ -2,20 +2,13 @@
 # first version
 
 # dAD = digit After Dot
-
-# 
-# should allow scientifc formating like 1.35E+08 -> (1.35, 8)
-# then make special other arithmetic
-# treating 1.35 as standard float and to math on 8
-#
-
 # when number too large ${#interger[@]} > MAX_DIGIT
 # try to do the math with and without dot
 
 #Use for futur test before operation
-declare -g MAX_INT=$((2**63-1))
-declare -g STR_MAX_INT=$(echo $MAX_INT)
-declare -g MAX_DIGIT=${#STR_MAX_INT}
+readonly MAX_INT=$((2**63-1))
+readonly STR_MAX_INT=$(echo $MAX_INT)
+readonly MAX_DIGIT=${#STR_MAX_INT}
 
 function to_int
 {
@@ -27,8 +20,7 @@ function to_int
 		for ((i=0; i < ${#integer}; i++))
 		do # the interger is the rest of the string without preceeding zeros
 			if [[ ${integer:$i:1} != '0' ]]; then
-				size=$(( ${#integer} - $i ))
-				integer=${integer:$i:$size}
+				integer=${integer:$i}
 				break
 			fi
 		done
@@ -104,14 +96,14 @@ function add
 	declare -i max_dAD=$dAD_1
 	if (( $dAD_2 > $dAD_1 )); then
 	 	max_dAD=$dAD_2
-	 	local diff=$(($dAD_2 - $dAD_1))
+	 	local diff=$(( dAD_2 - dAD_1 ))
 		int_1=$( catZeros $int_1 $diff )
 	else
 		max_dAD=$dAD_1
 		local diff=$(($dAD_1 - $dAD_2))
 		int_2=$( catZeros $int_2 $diff )
 	fi
-	result=$(( $int_1 + $int_2 ))
+	result=$(( int_1 + int_2 ))
 	echo $(to_strFloat ${result} ${max_dAD})
 }
 
@@ -128,33 +120,29 @@ function sub
 	declare -i max_dAD=$dAD_1
 	if (( $dAD_2 > $dAD_1 )); then
 	 	max_dAD=$dAD_2
-	 	local diff=$(($dAD_2 - $dAD_1))
+	 	local diff=$(( dAD_2 -  dAD_1 ))
 		int_1=$( catZeros $int_1 $diff )
 	else
 		max_dAD=$dAD_1
-		local diff=$(($dAD_1 - $dAD_2))
+		local diff=$(( dAD_1 -  dAD_2 ))
 		int_2=$( catZeros $int_2 $diff )
 	fi
-	result=$(( $int_1 - $int_2 ))
+	result=$(( int_1 - int_2 ))
 	echo $(to_strFloat ${result} ${max_dAD})
 }
 
 function mult
 {
-	#
-	# bench prob : mult 14.0 3.141592
-	#
-
 	local s_1=$1 #string contain float
 	local s_2=$2 #string contain float
-	local int_1
+	declare -i int_1
 	declare -i dAD_1
 	read -r int_1 dAD_1 <<< $(to_int $s_1) 
-	local int_2 
+	declare -i int_2 
 	declare -i dAD_2
 	read -r int_2 dAD_2 <<< $(to_int $s_2)
-	declare -i sum_dAD=$(( $dAD_1 + $dAD_2 ))
-	result=$(( $int_1 * $int_2 ))
+	declare -i sum_dAD=$(( dAD_1 + dAD_2 ))
+	result=$(( int_1 * int_2 ))
 	echo $(to_strFloat ${result} ${sum_dAD})
 }
 
@@ -163,8 +151,8 @@ function divide
 	declare -i numerator=$1
 	declare -i denominator=$2
 	declare -i recursionDepth=${3:-0}
-	local quotient=$(( $numerator / $denominator ))
-	local remainder=$(( $numerator % denominator ))
+	local quotient=$(( numerator / denominator ))
+	local remainder=$(( numerator % denominator ))
 	local sub_quotient=""
 	if (( $recursionDepth < 12 )) && (( $remainder > 0 )); then
 		recursion=$(($recursionDepth + 1))
@@ -183,11 +171,6 @@ function divide
 
 function div
 {
-	#
-	# bench prob : div 42 2.01
-	# div 0.36 11.1
-	#
-
 	local s_1=$1 #string containing float
 	local s_2=$2 #string containing float
 	declare -i int_1
@@ -197,25 +180,48 @@ function div
 	declare -i dAD_2
 	read -r int_2 dAD_2 <<< $(to_int $s_2)
 	declare -i max_dAD=$dAD_1
-	declare -i sub_dAD=$(( $dAD_1 - $dAD_2 ))
+	declare -i sub_dAD=$(( dAD_1 - dAD_2 ))
 	if (( $dAD_2 > $dAD_1 )); then
 	 	max_dAD=$dAD_2
-	 	local diff=$(($dAD_2 - $dAD_1))
+	 	local diff=$(( dAD_2 - dAD_1 ))
 		int_1=$( catZeros $int_1 $diff )
 	else
 		max_dAD=$dAD_1
-		local diff=$(($dAD_1 - $dAD_2))
+		local diff=$(( dAD_1 - dAD_2 ))
 		int_2=$( catZeros $int_2 $diff )
 	fi
 	result=$( divide $int_1 $int_2 )
 	echo "${result}"
-	# read -r result dAD_res <<< $(to_int $result)
-	# echo -e "result= ${result}" >> debug
-	# echo -e "dAD_res= ${dAD_res}" >> debug
-	# echo -e "sub_dAD= ${sub_dAD}" >> debug
-	# dAD_res=$(( $sub_dAD - $dAD_res ))
-	# echo -e "	sub= ${dAD_res}" >> debug
-	# echo $(to_strFloat ${result} ${dAD_res})
+}
+
+function power_int
+{
+	local int=$1
+	declare -i exponent=$2
+	local res=0
+	if (( exponent < 0 )); then
+		int=$( div 1.0 ${int} )
+		exponent=$(( -1 * exponent ))
+		res=$(power_int ${int} ${exponent})
+	elif (( exponent == 0 )); then
+		res=1
+	elif (( exponent % 2 == 0 )); then
+		int=$(( int * int ))
+		exponent=$(( exponent / 2 ))
+		res=$( power_int ${int} ${exponent} )
+	else
+		exponent=$(( (exponent - 1) / 2 ))
+		int2=$((int * int))
+		res=$( power_int $int2 $exponent )
+		res=$(( int * res ))
+	fi
+	echo ${res}
+}
+
+function sqrt
+{
+	# use continuous fraction
+	echo "not implemented yet"
 }
 
 function op
@@ -231,6 +237,11 @@ function op
 	# 	'-') ;;
 	# 	'*') ;;
 	# 	'/') ;;
+	#	'//') ;;
+	# 	'%') ;;
+	#	'^') ;;
+	#	'exp') ;;
+	#	'ln') ;;
 	# 	?)
 	# esac
 }
