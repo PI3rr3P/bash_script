@@ -20,9 +20,19 @@ declare -g MAX_DIGIT=${#STR_MAX_INT}
 function to_int
 {
 	local string=$1
-	declare -i integer=${string//./}
-	string=(${string//./ })
+	local integer=${string//'.'/}
+	string=(${string//'.'/' '})
 	declare -i dAD=${#string[1]}
+	if [[ ${string[0]} =~ [0]? ]]; then # remove leading zero 
+		for ((i=0; i < ${#integer}; i++))
+		do # the interger is the rest of the string without preceeding zeros
+			if [[ ${integer:$i:1} != '0' ]]; then
+				size=$(( ${#integer} - $i ))
+				integer=${integer:$i:$size}
+				break
+			fi
+		done
+	fi
 	echo ${integer} ${dAD}
 }
 
@@ -60,14 +70,14 @@ function to_strFloat
 	local string=""
 	# processing
 	# adding zero (if under unit)
-	if (( ${#integer[@]} - 1 - $dAD <= 0 ));then
+	if (( ${#integer[@]} - 1 - $dAD < 0 ));then
 		string+="0."
 		for ((i = 1; i < $dAD + 1 - ${#integer[@]}; i++))
 		do
 			string+="0"
 		done
 	fi
-	# adding  
+	# set the dot
 	for (( i=0; i < ${#integer[@]}; i++ ))
 	do
 		string+="${integer[i]}"
@@ -137,23 +147,13 @@ function mult
 
 	local s_1=$1 #string contain float
 	local s_2=$2 #string contain float
-	declare -i int_1
+	local int_1
 	declare -i dAD_1
 	read -r int_1 dAD_1 <<< $(to_int $s_1) 
-	declare -i int_2 
+	local int_2 
 	declare -i dAD_2
 	read -r int_2 dAD_2 <<< $(to_int $s_2)
-	declare -i max_dAD=$dAD_1
 	declare -i sum_dAD=$(( $dAD_1 + $dAD_2 ))
-	if (( $dAD_2 > $dAD_1 )); then
-	 	max_dAD=$dAD_2
-	 	local diff=$(($dAD_2 - $dAD_1))
-		int_1=$( catZeros $int_1 $diff )
-	else
-		max_dAD=$dAD_1
-		local diff=$(($dAD_1 - $dAD_2))
-		int_2=$( catZeros $int_2 $diff )
-	fi
 	result=$(( $int_1 * $int_2 ))
 	echo $(to_strFloat ${result} ${sum_dAD})
 }
@@ -225,4 +225,12 @@ function op
 	do
 		echo -e "$arg"
 	done
+	# operation=$2
+	# case ${operation} in
+	# 	'+') ;;
+	# 	'-') ;;
+	# 	'*') ;;
+	# 	'/') ;;
+	# 	?)
+	# esac
 }
