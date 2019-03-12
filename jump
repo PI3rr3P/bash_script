@@ -1,0 +1,71 @@
+#!/bin/bash
+
+function jump
+{
+	#parse argument
+	local targetFolder=$1
+	local pathTarget=""
+	# check argument
+	if [[ ${targetFolder} == "" ]]; then 
+		echo -e "Missing folder name!"
+		return 1
+	fi
+	# declaration block
+	local forward=true # search in sub dir
+	local backward=false # search in parent dir
+	local endSearch=false # end searching
+	declare -i depth=0
+	# use for backward search
+	local currentPath=$(pwd)
+	local localPath=${currentPath}
+	declare -a listParentFolder=(${currentPath//'/'/' '})
+	declare -i rootIndex=$(( ${#listParentFolder} - 2 ))
+	# main loop
+	while [[ ${endSearch} == false ]]
+	do
+		declare -a result=$(find $currentPath -maxdepth ${depth} -path "*/${targetFolder}" -type d)
+		result=(${result})
+		if [[ ${#result[@]} -gt 0 ]]; then
+			pathTarget=${result[0]}
+			endSearch=true
+			if (( ${#result[@]} > 1 )); then
+				echo -e " other match could be :"
+				for (( i=1; i < ${#result[@]}; i++))
+				do
+					echo -e "\tcd ${result[i]}"
+				done
+			fi
+		fi
+		# look at sub directories
+		if [[ ${forward} == true ]]; then
+			if (( ${depth} > 5 )); then
+				depth=1
+				forward=false
+				backward=true
+			else
+				depth=$(( ${depth} + 1 ))
+			fi
+		fi
+		# look close to parents directories
+		if [[ ${backward} == true ]]; then
+			if (( $rootIndex >= 1 )); then
+				currentPath=''
+				for ((i=$rootIndex; i >= 0; i--))
+				do
+					currentPath="${listParentFolder[$i]}/${currentPath}"
+				done
+				currentPath="/${currentPath}"
+				rootIndex=$(( rootIndex - 1 ))
+			else
+				endSearch=true
+			fi
+		fi
+	done
+	# process result
+	if [[ ${pathTarget} != '' ]]; then
+		cd ${pathTarget}
+	else
+		echo -e "Folder (:${targetFolder}) not close enough"
+	fi
+	return 0
+}
