@@ -1,5 +1,103 @@
 #!/bin/bash
 
+source ${HOME}/bin/bash_script/dynamicSelect.sh
+
+function _addGOTOFile
+{
+	local folderPath=$1
+	local -i number=1
+	local split=""
+	local isYetInFile=$( grep "${folderPath}" ${HOME}/.gotorc )
+	if [[ ${isYetInFile} != "" ]]; then
+		split=(${isYetInFile})
+		number=${split[1]}
+		number=$(( number + 1 ))
+		sed -i 's_'"${isYetInFile}"'_'"${folderPath} ${number}"'_g' ${HOME}/.gotorc
+	else
+		echo "${folderPath} ${number}" >> ${HOME}/.gotorc
+	fi
+	sort +1 -nr ${HOME}/.gotorc > ${HOME}/.tmp_gotorc
+	#mv ${HOME}/.tmp_gotorc ${HOME}/.gotorc
+	lineGOTOFile=$(wc -l ${HOME}/.gotorc)
+	lineGOTOFile=${lineGOTOFile:0:1}
+	if [[ $lineGOTOFile -gt 2000 ]] || [[ $number -gt 10000 ]]; then
+		_cleanGOTOFile
+	fi
+	return 0
+}
+
+function _cleanGOTOFile
+{
+	local -i min=0
+	local tmp
+	local split
+	local adress
+	local number
+	sort +1 -nr ${HOME}/.gotorc > ${HOME}/.tmp_gotorc
+	mapfile -t lines < ${HOME}/.tmp_gotorc
+	# read max/min
+	tmp=${#lines[@]}
+	tmp=$((tmp - 1))
+	split=(${lines[$tmp]})
+	min=${split[1]}
+	# overwritte tmp
+	echo -n "" > ${HOME}/.tmp_gotorc
+	for (( i=0; i <= $tmp; i++ ))
+	do
+		split=(${lines[$i]})
+		adress=${split[0]}
+		number=${split[1]}
+		if (( $number > $min )); then
+			number=$(( ${number} - ${min} ))
+			echo "${adress} ${number}" >> ${HOME}/.tmp_gotorc
+		fi
+	done
+	mv ${HOME}/.tmp_gotorc ${HOME}/.gotorc
+	echo -e "Your ~/.gotorc file need to be cleaned"
+	echo -e "    please execute: \033[36;1m_cleanPatternGOTOFile\033[0m *pattern*"
+	echo -e "    with the pattern you use to find folder : \033[1m${lines[0]}\033[0m"
+	return 0
+}
+
+function _cleanPatternGOTOFile
+{
+	local folderPattern=$1
+	local -i number=0
+	local -i size=0
+	local adress=""
+	grep "${folderPattern}" "${HOME}/.gotorc" > "${HOME}/.tmp_gotorc"
+	sort +1 -nr "${HOME}/.tmp_gotorc" > "${HOME}/.tmp_tmp_gotorc"
+	mv "${HOME}/.tmp_tmp_gotorc" "${HOME}/.tmp_gotorc"
+	mapfile -t match < ${HOME}/.tmp_gotorc
+	size=${#match[@]}
+	for ((i=0; i < ${size}; i++))
+	do
+		split=(${match[$i]})
+		adress=${split[0]}
+		number=$(( $size - $i ))
+		echo -e 'sed ' 's_'"${match[$i]}"'_'"${adress} ${number}"'_g'
+		sed -i 's_'"${match[$i]}"'_'"${adress} ${number}"'_g' "${HOME}/.gotorc"
+	done
+	rm -f "${HOME}/.tmp_gotorc"
+	return 0
+}
+
+function _notInArray
+{
+	local -a array=$1
+	local word=$2
+	array=(${array})
+	for elt in ${array[@]}
+	do
+		if [[ $word == $elt ]]; then
+			echo 'false'
+			break
+		fi
+	done
+	echo 'true'
+	return 0
+}
+
 function goto
 {
 	#parse argument 
@@ -7,45 +105,73 @@ function goto
 	local MAX_RECURSION_DEPTH=10
 	# check argument
 	if [[ -z ${targetFolder} ]]; then
-		echo -e "usage $0:"
-		echo -e "    goto 'folderName'"
-		echo -e "    then go to the first occurence of this folder"
-		return 1
+		echo -e "usage ${FUNCNAME[0]}: \033[36;1mgoto\033[0m folderName"
+		return 0
 	fi
 	if [[ $2 == '-d' ]]; then
 		MAX_RECURSION_DEPTH=${3:-10}
 	fi
 	# declaration bloc
 	declare -i depth=1
-	local endSearch='false'
+	local endSearch=false
 	local finalDestination=""
 	# check for first occurence in the file tree
-	while [[ ${endSearch} == 'false' ]] && [[ ${depth} -le ${MAX_RECURSION_DEPTH} ]]; 
+	while [[ ${endSearch} == false ]] && [[ ${depth} -le ${MAX_RECURSION_DEPTH} ]]; 
 	do
-		declare -a pathFounded=$(find ${HOME} -maxdepth $depth -mindepth $depth -path "*/${targetFolder}" -type d )
-		pathFounded=(${pathFounded})
-		if [[ ${#pathFounded[@]} -gt 0 ]]; then
-			finalDestination=${pathFounded[0]}
-			if (( ${#pathFounded[@]} > 1 )); then
-				echo -e " other match could be :"
-				for (( i=1; i < ${#pathFounded[@]}; i++))
+		# look into most viewed files
+		if [[ $depth -eq 1 ]]; then 
+			mapfile -t preference < <( grep "*/${targetFolder}" ${HOME}/.gotorc )
+			if [[ ${#preference[@]} -gt 0 ]]; then
+				# remove number occurence and duplicata
+				local -a cleanPreference
+				echo -e "preference before cleaning ${preference[@]}"
+				for ((i=0; i < ${#preference[@]}; i++))
 				do
-					echo -e "\tcd ${pathFounded[i]}"
+					local split=(${preference[$i]})
+					cleanPreference+=("${split[0]}")
 				done
+				preference=${cleanPreference[@]}
+				echo -e "preference=${preference[@]}"
 			fi
-			endSearch='true'
+		fi
+		# make a tree search
+		mapfile -t pathFounded < <( find ${HOME} -maxdepth $depth -mindepth $depth -path "*/${targetFolder}" -type d -print )
+		# merge the two searches
+		if [[ ${#preference[@]} -gt 0 ]]; then
+			for elt in ${pathFounded[@]}
+			do
+				echo -e "${elt}"
+				local isInPathFound=$(_notInArray "${pathFounded[@]}" "$elt")
+				if [[ $isInPathFound == 'true' ]]; then
+					preference+=("$elt")
+				fi
+			done
+			pathFounded=${preference[@]}
+			preference=() # overwrite for next loop
+			echo -e "merge ${pathFounded[@]}"
+		fi
+		# choose final destination
+		if [[ ${#pathFounded[@]} -eq 1 ]]; then
+			finalDestination=${pathFounded[0]}
+			endSearch=true
+		elif [[ ${#pathFounded[@]} -gt 1 ]]; then
+			_dynamicSelect "${pathFounded[*]}" "${FUNCNAME[0]}" finalDestination
+			if [[ ${finalDestination} != "" ]] || [[ ${depth} -ge ${MAX_RECURSION_DEPTH} ]]; then
+				endSearch=true
+			fi
 		fi
 		depth=$(( ${depth} + 1 ))
 	done
 	# change folder or send an error message
 	if [[ finalDestination != "" ]]; then
-		cd ${finalDestination}
+		cd "${finalDestination}"
+		_addGOTOFile "${finalDestination}"
 	elif [[ ${depth} -gt ${MAX_RECURSION_DEPTH} ]]; then
 		echo -e "Can't reach that folder because of max recursion depth"
 		depth=$(( $depth + 1 ))
 		echo -e " file to deep, try goto folderName -d $depth"
 	else
-		echo -e "Can't file that folder: ${targetFolder}"
+		echo -e "Can't find that folder: ${targetFolder}"
 	fi
 	return 0
 }
