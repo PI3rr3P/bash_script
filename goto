@@ -12,7 +12,7 @@ function _addGOTOFile
 		split=(${isYetInFile})
 		number=${split[1]}
 		number=$(( number + 1 ))
-		sed -i 's_'"${isYetInFile}"'_'"${folderPath} ${number}"'_g' ${HOME}/.gotorc
+		sed -i 's@'"${isYetInFile}"'@'"${folderPath} ${number}"'@g' ${HOME}/.gotorc
 	else
 		echo "${folderPath} ${number}" >> ${HOME}/.gotorc
 	fi
@@ -65,9 +65,9 @@ function _cleanPatternGOTOFile
 	local -i number=0
 	local -i size=0
 	local adress=""
-	grep "${folderPattern}" "${HOME}/.gotorc" > "${HOME}/.tmp_gotorc"
-	sort +1 -nr "${HOME}/.tmp_gotorc" > "${HOME}/.tmp_tmp_gotorc"
-	mv "${HOME}/.tmp_tmp_gotorc" "${HOME}/.tmp_gotorc"
+	grep ${folderPattern} ${HOME}/.gotorc > ${HOME}/.tmp_gotorc
+	sort +1 -nr ${HOME}/.tmp_gotorc > ${HOME}/.tmp_tmp_gotorc
+	mv ${HOME}/.tmp_tmp_gotorc ${HOME}/.tmp_gotorc
 	mapfile -t match < ${HOME}/.tmp_gotorc
 	size=${#match[@]}
 	for ((i=0; i < ${size}; i++))
@@ -75,10 +75,9 @@ function _cleanPatternGOTOFile
 		split=(${match[$i]})
 		adress=${split[0]}
 		number=$(( $size - $i ))
-		echo -e 'sed ' 's_'"${match[$i]}"'_'"${adress} ${number}"'_g'
-		sed -i 's_'"${match[$i]}"'_'"${adress} ${number}"'_g' "${HOME}/.gotorc"
+		sed -i 's@'"${match[$i]}"'@'"${adress} ${number}"'@g' ${HOME}/.gotorc
 	done
-	rm -f "${HOME}/.tmp_gotorc"
+	rm -f ${HOME}/.tmp_gotorc
 	return 0
 }
 
@@ -135,7 +134,7 @@ function goto
 			fi
 		fi
 		# make a tree search
-		mapfile -t pathFounded < <( find ${HOME} -maxdepth $depth -mindepth $depth -path "*/${targetFolder}" -type d -print )
+		mapfile -t pathFounded < <( find ${HOME} -maxdepth $depth -mindepth $depth -path "*/${targetFolder}" -type d )
 		# merge the two searches
 		if [[ ${#preference[@]} -gt 0 ]]; then
 			for elt in ${pathFounded[@]}
